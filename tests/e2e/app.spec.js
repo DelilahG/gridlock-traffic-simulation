@@ -97,6 +97,9 @@ test('sliders change the live simulation', async ({ page }) => {
   await page.locator('#peds').uncheck();
   expect(await page.evaluate(() => window.__gridlock.sim.pedestrians)).toBe(false);
   await expect(page.locator('#pedRate')).toBeDisabled();
+  await page.locator('#taxis').fill('40');
+  expect(await page.evaluate(() => window.__gridlock.sim.taxiShare)).toBeCloseTo(0.4);
+  await expect(page.locator('#taxisV')).toHaveText('40% of vehicles');
   await page.locator('#smart').check();
   expect(await page.evaluate(() => window.__gridlock.sim.smartRouting)).toBe(true);
 });
@@ -114,7 +117,7 @@ test('clicking a junction opens the inspector and metrics update', async ({ page
   await expect.poll(() => page.evaluate(() => window.__gridlock.sim.t), { timeout: 15_000 }).toBeGreaterThan(40);
   const p = await worldPoint(page, 450, 300);
   await page.mouse.click(p.x, p.y);
-  await expect(page.locator('#inspector .insp-head b')).toHaveText('B2');
+  await expect(page.locator('#inspector .insp-head b')).toHaveText('Meskel Square');
   await expect(page.locator('#inspector .q')).toHaveCount(4);
   await expect(page.locator('#m_on')).not.toHaveText('0');
   await expect(page.locator('#level')).not.toHaveText('No traffic');

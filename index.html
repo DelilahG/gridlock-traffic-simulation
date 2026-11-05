@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Gridlock: an interactive city traffic simulation with car-following physics, routed trips, pedestrians and four traffic-signal control strategies." />
+    <meta name="description" content="Gridlock: an interactive traffic simulation of nine Addis Ababa junctions, with car-following physics, routed trips, minibus taxis, pedestrians and four traffic-signal control strategies." />
     <meta name="theme-color" content="#0b1016" />
-    <title>Gridlock · City Traffic Simulation</title>
+    <title>Gridlock · Addis Ababa Traffic Simulation</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
         <span class="logo" aria-hidden="true"><i></i><i></i><i></i></span>
-        <h1>GRIDLOCK <small>City Traffic Simulation</small></h1>
+        <h1>GRIDLOCK <small>Addis Ababa Traffic Simulation</small></h1>
       </div>
       <div class="topbar-status">
         <span class="chip" id="runState" data-state="ready">Ready</span>
@@ -26,12 +26,13 @@
       <section class="stage" aria-label="Simulation view">
         <canvas id="world" role="img" aria-label="Top-down map of a 3 by 3 grid of signalised junctions with moving vehicles and pedestrians"></canvas>
         <div class="overlay" id="intro">
-          <p class="overlay-title">Nine junctions, one city grid.</p>
-          <p>Vehicles follow routed trips, keep safe gaps, yield on permissive left turns and stop for pedestrians.</p>
+          <p class="overlay-title">Nine Addis Ababa junctions, from Piassa to Bole.</p>
+          <p>Cars and blue-and-white minibus taxis follow routed trips, keep safe gaps, yield on left turns and stop for pedestrians. Taxis pull over to pick up passengers, holding up the traffic behind them.</p>
           <button class="btn pri" id="introStart" type="button"><i data-lucide="play"></i>Start simulation</button>
         </div>
         <div class="legend" aria-hidden="true">
           <span>Speed</span><span>stopped</span><span class="ramp"></span><span>50 km/h</span>
+          <span class="sep"></span><span class="taxi"></span><span>minibus taxi</span>
           <span class="sep"></span><span class="ring"></span><span>queue</span>
         </div>
         <div class="hint">Click a junction to inspect it</div>
@@ -79,6 +80,8 @@
           <label class="toggle"><input type="checkbox" id="peds" checked /> Pedestrians</label>
           <label class="lbl" for="pedRate">Pedestrian arrivals <span class="val" id="pedRateV"></span></label>
           <input id="pedRate" type="range" min="2" max="40" step="2" value="12" />
+          <label class="lbl" for="taxis">Minibus taxis <span class="val" id="taxisV"></span></label>
+          <input id="taxis" type="range" min="0" max="50" step="5" value="25" />
           <label class="toggle"><input type="checkbox" id="smart" /> Congestion-aware routing</label>
           <label class="toggle"><input type="checkbox" id="heat" checked /> Colour vehicles by speed</label>
         </section>
@@ -94,6 +97,8 @@
             <div class="stat"><b id="m_pend">0</b><span>waiting to enter</span></div>
             <div class="stat"><b id="m_ped">0</b><span>pedestrians crossed</span></div>
             <div class="stat"><b id="m_pw">–</b><span>avg ped wait s</span></div>
+            <div class="stat"><b id="m_taxi">0</b><span>taxis · <em id="m_kerb">0</em> at the kerb</span></div>
+            <div class="stat"><b id="m_tstops">0</b><span>taxi pick-ups</span></div>
           </div>
           <div class="spark">
             <div class="spark-h"><span>Avg speed</span><span>last 3 min</span></div>

@@ -140,6 +140,10 @@ function wireControls() {
     settings.ewShare = v / 100;
     sim.setDemand(settings.demand, settings.ewShare);
   });
+  bindRange('taxis', 'taxisV', (v) => `${v}% of vehicles`, (v) => {
+    settings.taxiShare = v / 100;
+    sim.taxiShare = v / 100;
+  });
   bindRange('pedRate', 'pedRateV', (v) => `${v} /min`, (v) => {
     settings.pedRate = v;
     sim.pedRate = v;
@@ -199,6 +203,9 @@ function updateStats() {
   $('m_pend').textContent = m.pending;
   $('m_ped').textContent = m.pedCrossed;
   $('m_pw').textContent = fmt(m.avgPedWait);
+  $('m_taxi').textContent = m.taxis;
+  $('m_kerb').textContent = m.taxisAtKerb;
+  $('m_tstops').textContent = m.taxiStops;
   const t = Math.floor(sim.t);
   $('clock').textContent = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   const lvl = congestionLevel(m);

@@ -114,11 +114,11 @@ export class Renderer {
           g.stroke();
         }
       }
-      g.fillStyle = '#5b6a7d';
-      g.font = '600 9px ui-monospace, Menlo, monospace';
+      g.fillStyle = '#6b7b8f';
+      g.font = '600 9px ui-sans-serif, system-ui, sans-serif';
       g.textAlign = 'left';
       g.textBaseline = 'alphabetic';
-      g.fillText(J.label, J.x + ROAD_HALF + 8, J.y - ROAD_HALF - 8);
+      g.fillText(J.label, J.x + STOP_OFF + 8, J.y - ROAD_HALF - 10); // clear of the signal lamps
     }
   }
 
@@ -198,9 +198,15 @@ export class Renderer {
       : u.kind === 'van'
         ? 'hsl(210, 15%, 78%)'
         : `hsl(${u.hue}, 55%, 60%)`;
+    if (u.kind === 'taxi' && !heat) ctx.fillStyle = '#2f6fd6'; // Addis minibus blue
     ctx.beginPath();
     ctx.roundRect(-hl, -hw, u.len, u.wid, 2);
     ctx.fill();
+    if (u.kind === 'taxi') {
+      // white upper body: the blue-and-white minibus livery
+      ctx.fillStyle = '#f4f7fb';
+      ctx.fillRect(-hl + 3, -hw + 1.6, u.len - 8, u.wid - 3.2);
+    }
     ctx.fillStyle = '#0b101688';
     ctx.fillRect(hl - 6, -hw + 1, 3, u.wid - 2);
     const braking = u.v < STOPPED_SPEED || u.acc < -1.5 * PX_PER_M;
@@ -209,7 +215,11 @@ export class Renderer {
       ctx.fillRect(-hl, -hw + 0.5, 1.6, 2);
       ctx.fillRect(-hl, hw - 2.5, 1.6, 2);
     }
-    if (turn && turn !== 'straight' && blinkOn) {
+    if (u.dwelling && blinkOn) {
+      // hazard lights while picking up passengers at the kerb
+      ctx.fillStyle = '#ffb020';
+      for (const x of [hl - 2, -hl]) for (const y of [-hw, hw - 2]) ctx.fillRect(x, y, 2, 2);
+    } else if (turn && turn !== 'straight' && blinkOn) {
       ctx.fillStyle = '#ffb020';
       const side = turn === 'right' ? hw - 2 : -hw;
       ctx.fillRect(hl - 2, side, 2, 2);

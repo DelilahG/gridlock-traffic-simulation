@@ -202,6 +202,13 @@ h1 small {
   height: 14px;
   background: var(--line);
 }
+.legend .taxi {
+  width: 16px;
+  height: 8px;
+  border-radius: 2px;
+  background: #2f6fd6;
+  box-shadow: inset 0 0 0 2px #2f6fd6, inset 0 0 0 8px #f4f7fb;
+}
 .legend .ring {
   width: 12px;
   height: 12px;
@@ -555,6 +562,8 @@ td.best {
     bottom: 8px;
   }
   .legend .sep,
+  .legend .taxi,
+  .legend .taxi + span,
   .legend .ring,
   .legend .ring + span {
     display: none;
