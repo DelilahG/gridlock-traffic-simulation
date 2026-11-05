@@ -112,6 +112,8 @@ Browser tests use the preinstalled Microsoft Edge on Windows, so nothing needs t
 - *Simulation, other*: determinism by seed, vehicle conservation, saturation behaviour without NaNs, live demand, pedestrian and timing changes, and a per-step performance budget.
 - *Browser*: ready state, start/pause/resume/reset, single step, keyboard shortcuts, mode switching with matching timing controls, live sliders, seed, junction inspector, the full benchmark, mobile layout without horizontal scroll, and no console errors.
 
+GitHub Actions runs lint, the unit tests, the production build and the browser tests on every push and pull request (`.github/workflows/ci.yml`).
+
 Latest local run: lint clean, **39/39** unit tests and **10/10** browser tests passing.
 
 ## Calibration to Addis Ababa
