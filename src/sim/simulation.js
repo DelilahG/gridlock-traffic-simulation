@@ -26,7 +26,14 @@ export const DEFAULTS = {
   pedestrians: true,
   pedRate: 12, // pedestrians per minute across the network
   smartRouting: false, // re-plan routes around queues at departure time
+  taxiShare: 0.25, // fraction of vehicles that are minibus taxis
 };
+
+// Minibus taxis pull over to pick up and drop off passengers. On these
+// single-lane roads that stops the traffic behind them while they dwell.
+const MAX_VEHICLE_LEN = 22; // vans
+
+export const TAXI = { len: 19, wid: 8, stopChance: 0.5, dwellMin: 3, dwellMax: 8, minLinkLen: 90 };
 
 const LOOKAHEAD = 400;
 
@@ -52,6 +59,7 @@ export class Simulation {
     this.pedestrians = o.pedestrians;
     this.pedRate = o.pedRate;
     this.smartRouting = o.smartRouting;
+    this.taxiShare = o.taxiShare;
     this.timing = { ...DEFAULT_TIMING, ...(options.timing || {}) };
     this.rand = createRng(o.seed);
     this.net = buildNetwork();
@@ -83,6 +91,7 @@ export class Simulation {
       pedCollisions: 0,
       emergencyStops: 0,
       pedCrossed: 0,
+      taxiStops: 0,
       sumPedWait: 0,
       vehicleSeconds: 0,
       pendingSeconds: 0,
@@ -164,18 +173,25 @@ export class Simulation {
   trySpawn(e) {
     const link = e.link;
     const last = link.vehicles[link.vehicles.length - 1];
-    const van = this.rand() < 0.08;
-    const len = van ? 22 : 15 + Math.floor(this.rand() * 3);
+    // The vehicle type is drawn once per waiting vehicle; redrawing on every attempt
+    // would favour short cars whenever the entry is congested.
+    if (!e.next) {
+      const r = this.rand();
+      const taxi = r < this.taxiShare;
+      const van = !taxi && r < this.taxiShare + 0.08 * (1 - this.taxiShare);
+      e.next = { taxi, van, len: taxi ? TAXI.len : van ? 22 : 15 + Math.floor(this.rand() * 3) };
+    }
+    const { taxi, van, len } = e.next;
     if (last && last.s - last.len < len + IDM.s0 + 2) return false;
     const exit = this.pickDestination(e);
     const route = this.routeFor(link, exit);
     if (!route) return false;
-    const v0 = SPEED_LIMIT * (van ? 0.85 : 0.88 + this.rand() * 0.22);
+    const v0 = SPEED_LIMIT * (van ? 0.85 : taxi ? 0.95 : 0.88 + this.rand() * 0.22);
     const u = {
       id: this.nextId++,
-      kind: van ? 'van' : 'car',
+      kind: taxi ? 'taxi' : van ? 'van' : 'car',
       len,
-      wid: van ? 8 : 7,
+      wid: taxi ? TAXI.wid : van ? 8 : 7,
       v0,
       v: last ? Math.min(last.v, v0 * 0.8) : v0 * 0.8,
       acc: 0,
@@ -189,14 +205,38 @@ export class Simulation {
       stops: 0,
       wasStopped: false,
       hue: Math.floor(this.rand() * 360),
+      curb: taxi ? this.planCurbStops(route) : null,
+      dwelling: false,
       x: 0,
       y: 0,
       ang: 0,
     };
+    e.next = null;
     link.vehicles.push(u);
     this.vehicles.push(u);
     this.stats.spawned++;
     return true;
+  }
+
+  // Choose kerbside stops along a taxi's route: link id -> { s, dwell, done }.
+  planCurbStops(route) {
+    const stops = new Map();
+    for (const P of route) {
+      if (P.kind !== 'link' || P.isExit || P.len < TAXI.minLinkLen) continue;
+      if (this.rand() >= TAXI.stopChance) continue;
+      // Far enough past the junction that the longest vehicle queued behind a
+      // stopped taxi still clears the crosswalk and the box; before the stop line.
+      const lo = Math.max(P.isEntry ? 60 : 0, CROSSWALK + TAXI.len + MAX_VEHICLE_LEN + IDM.s0 + 4);
+      const hi = P.len - 30;
+      if (hi <= lo) continue;
+      stops.set(P.id, { s: lo + this.rand() * (hi - lo), dwell: TAXI.dwellMin + this.rand() * (TAXI.dwellMax - TAXI.dwellMin), done: false });
+    }
+    return stops;
+  }
+
+  pendingCurb(u, link) {
+    const st = u.curb?.get(link.id);
+    return st && !st.done ? st : null;
   }
 
   /* ---------------- junction logic ---------------- */
@@ -259,6 +299,11 @@ export class Simulation {
         for (let k = 1; k < link.vehicles.length; k++) link.vehicles[k].permit = false;
         if (link.committed === u) {
           u.permit = true;
+          continue;
+        }
+        // a taxi still due to stop at the kerb on this link must not reserve the junction
+        if (this.pendingCurb(u, link)) {
+          u.permit = false;
           continue;
         }
         const dist = link.len - u.s;
@@ -345,6 +390,10 @@ export class Simulation {
         } else {
           acc = Math.min(acc, this.lookahead(u, P));
         }
+        if (u.curb && P.kind === 'link') {
+          const st = this.pendingCurb(u, P);
+          if (st) acc = Math.min(acc, idmAcceleration(u.v, u.v0, st.s - u.s, 0, 1));
+        }
         u.acc = Math.max(-IDM.bMax, Math.min(IDM.a, acc));
       }
     }
@@ -368,6 +417,19 @@ export class Simulation {
           u.wasStopped = true;
         }
       } else if (u.v > 2 * STOPPED_SPEED) u.wasStopped = false;
+      if (u.curb) {
+        const P = u.route[u.idx];
+        const st = P.kind === 'link' ? this.pendingCurb(u, P) : null;
+        u.dwelling = !!st && st.s - u.s < 2.5 && u.v < STOPPED_SPEED;
+        if (u.dwelling) {
+          st.dwell -= dt;
+          if (st.dwell <= 0) {
+            st.done = true;
+            u.dwelling = false;
+            this.stats.taxiStops++;
+          }
+        }
+      }
     }
   }
 
@@ -688,6 +750,9 @@ export class Simulation {
       emergencyStops: s.emergencyStops,
       pedCrossed: s.pedCrossed,
       pedWaiting: this.peds.filter((p) => p.state === 'wait').length,
+      taxis: this.vehicles.reduce((n, u) => n + (u.kind === 'taxi' ? 1 : 0), 0),
+      taxisAtKerb: this.vehicles.reduce((n, u) => n + (u.dwelling ? 1 : 0), 0),
+      taxiStops: s.taxiStops,
       avgPedWait: s.pedCrossed ? s.sumPedWait / s.pedCrossed : null,
     };
   }

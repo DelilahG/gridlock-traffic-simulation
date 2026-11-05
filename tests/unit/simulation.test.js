@@ -164,3 +164,93 @@ test('performance: a step with ~100 vehicles stays well under a frame budget', (
 test('unknown mode is rejected', () => {
   assert.throws(() => new Simulation({ mode: 'nope' }), /Unknown signal mode/);
 });
+
+test('junctions carry Addis Ababa names', () => {
+  const s = new Simulation();
+  const names = s.net.junctions.map((J) => J.label);
+  assert.deepEqual(names, ['Piassa', 'Arat Kilo', 'Megenagna', 'Mexico', 'Meskel Square', 'Kazanchis', 'Sarbet', 'Gotera', 'Bole']);
+  assert.equal(s.net.junctions[4].code, 'B2');
+});
+
+test('minibus taxis appear at the configured share and none when disabled', () => {
+  const s = new Simulation({ taxiShare: 0.4, demand: 60, seed: 8 });
+  s.run(120);
+  let taxis = 0;
+  let total = 0;
+  const seen = new Set();
+  for (let k = 0; k < 2400; k++) {
+    s.step();
+    for (const u of s.vehicles) {
+      if (seen.has(u.id)) continue;
+      seen.add(u.id);
+      total++;
+      if (u.kind === 'taxi') taxis++;
+    }
+  }
+  assert.ok(Math.abs(taxis / total - 0.4) < 0.08, `taxi share ${taxis / total}`);
+  const none = new Simulation({ taxiShare: 0 });
+  none.run(120);
+  assert.equal(none.vehicles.filter((u) => u.kind === 'taxi').length, 0);
+  assert.equal(none.stats.taxiStops, 0);
+});
+
+test('taxis stop at the kerb, dwell, then continue, without reserving a junction meanwhile', () => {
+  const s = new Simulation({ taxiShare: 0.5, demand: 50, seed: 12 });
+  const dwellStart = new Map();
+  const dwellTime = [];
+  for (let k = 0; k < 6000; k++) {
+    s.step();
+    for (const J of s.net.junctions) {
+      for (let d = 0; d < 4; d++) {
+        const link = J.approach[d];
+        if (link.committed) assert.equal(s.pendingCurb(link.committed, link), null, 'taxi committed with a pending kerb stop');
+      }
+    }
+    for (const u of s.vehicles) {
+      if (u.kind !== 'taxi') continue;
+      if (u.dwelling && !dwellStart.has(u.id)) dwellStart.set(u.id, s.t);
+      if (!u.dwelling && dwellStart.has(u.id)) {
+        dwellTime.push(s.t - dwellStart.get(u.id));
+        dwellStart.delete(u.id);
+        assert.ok(u.v < 10, 'pulls away from a standstill');
+      }
+      if (u.dwelling) assert.ok(u.v < 2.1, 'dwelling taxis are stopped');
+    }
+  }
+  assert.ok(s.stats.taxiStops > 40, `only ${s.stats.taxiStops} stops`);
+  const avg = dwellTime.reduce((a, b) => a + b, 0) / dwellTime.length;
+  assert.ok(avg > 2.5 && avg < 9, `average dwell ${avg}`);
+  assert.equal(s.stats.collisions, 0);
+  assert.equal(s.stats.pedCollisions, 0);
+  assert.equal(s.stats.emergencyStops, 0);
+});
+
+test('kerbside taxi stops add delay to the traffic behind them', () => {
+  const delay = (taxiShare) => {
+    const s = new Simulation({ taxiShare, demand: 45, seed: 1337 });
+    s.run(60);
+    const a = s.snapshot();
+    s.run(300);
+    return windowMetrics(a, s.snapshot()).avgDelay;
+  };
+  assert.ok(delay(0.5) > delay(0) * 1.2);
+});
+
+test('kerb stops leave room for a queued vehicle to clear the junction behind the taxi', () => {
+  const s = new Simulation({ taxiShare: 1, seed: 4 });
+  let checked = 0;
+  for (const entry of s.net.entries) {
+    for (const exit of s.entries[0].dests.slice(0, 4)) {
+      const route = s.routeFor(entry, exit);
+      if (!route) continue;
+      for (const [id, st] of s.planCurbStops(route)) {
+        const link = s.net.links[id];
+        // taxi rear, minus a 22-unit van and its jam gap, must still be past the crosswalk
+        assert.ok(st.s - 19 - 22 - 8 >= 9, `stop at ${st.s} on link ${id}`);
+        assert.ok(st.s <= link.len - 30);
+        checked++;
+      }
+    }
+  }
+  assert.ok(checked > 10);
+});

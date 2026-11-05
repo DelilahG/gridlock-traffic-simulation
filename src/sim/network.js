@@ -23,6 +23,14 @@ function laneOffset(d) {
   return [-dy * LANE_OFF, dx * LANE_OFF];
 }
 
+// Well-known central Addis Ababa junctions, placed roughly by compass direction
+// (north at the top). The grid is stylised: distances and street layout are not to scale.
+export const JUNCTION_NAMES = [
+  ['Piassa', 'Arat Kilo', 'Megenagna'],
+  ['Mexico', 'Meskel Square', 'Kazanchis'],
+  ['Sarbet', 'Gotera', 'Bole'],
+];
+
 const CONFLICT_DISTANCE = 9; // paths closer than this (car width + margin) conflict
 export const TURN_PENALTY = { straight: 0, right: 3, left: 6 }; // seconds, used by routing
 
@@ -41,7 +49,8 @@ export function buildNetwork() {
         j,
         x: COLS[i],
         y: ROWS[j],
-        label: 'ABC'[i] + (j + 1),
+        code: 'ABC'[i] + (j + 1),
+        label: JUNCTION_NAMES[j]?.[i] ?? 'ABC'[i] + (j + 1),
         approach: [null, null, null, null], // incoming link by travel direction
         exit: [null, null, null, null], // outgoing link by travel direction
         connectors: [],
