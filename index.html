@@ -1,461 +1,134 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gridlock — City Traffic Simulation</title>
-<style>
-:root{--bg:#0b1016;--panel:#121923;--panel2:#18212d;--line:#243040;--ink:#e8eef5;--mut:#8796a8;--acc:#ffb020;--g:#2ecc71;--r:#ff4d4d;--y:#ffd23f;--blue:#4cc3ff}
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
-header{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
-.logo{width:30px;height:30px;border-radius:8px;background:conic-gradient(var(--g) 0 33%,var(--y) 0 66%,var(--r) 0);box-shadow:0 0 0 3px #0b1016 inset}
-h1{font-size:17px;margin:0;letter-spacing:.3px}
-header small{color:var(--mut)}
-header .sp{flex:1}
-.live{font:600 12px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
-.live b{color:var(--acc)}
-main{display:grid;grid-template-columns:1fr 340px;gap:14px;padding:14px;height:calc(100% - 55px)}
-.stage{position:relative;min-height:0;background:#0e141b;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-canvas#c{width:100%;height:100%;display:block}
-.legend{position:absolute;left:12px;bottom:12px;display:flex;gap:10px;align-items:center;background:#0b1016cc;border:1px solid var(--line);padding:6px 10px;border-radius:10px;font-size:12px;color:var(--mut)}
-.legend i{display:inline-block;width:90px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsl(0,75%,55%),hsl(60,75%,55%),hsl(120,75%,55%))}
-aside{display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0;padding-right:2px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
-.card h2{margin:0 0 10px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut);font-weight:700}
-label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
-label span{float:right;color:var(--ink);font-family:ui-monospace,Menlo,monospace}
-select,input[type=range]{width:100%}
-select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
-input[type=range]{accent-color:var(--acc)}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.seg button,.btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 6px;cursor:pointer;font:inherit;font-weight:600}
-.seg button.on{background:var(--acc);color:#1a1200;border-color:var(--acc)}
-.btn:hover,.seg button:hover{border-color:var(--acc)}
-.btn.pri{background:var(--acc);color:#1a1200;border-color:var(--acc)}
-.row{display:flex;gap:8px;margin-top:10px}.row .btn{flex:1}
-.chk{display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--ink);font-size:13px}
-.desc{color:var(--mut);font-size:12px;margin:8px 0 0}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.stat{background:var(--panel2);border-radius:10px;padding:8px 10px}
-.stat b{display:block;font:700 18px ui-monospace,Menlo,monospace}
-.stat span{font-size:11px;color:var(--mut)}
-canvas#spark{width:100%;height:54px;display:block;margin-top:10px}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--line)}
-th:first-child,td:first-child{text-align:left}
-th{color:var(--mut);font-weight:600}
-td.best{color:var(--g);font-weight:700}
-#bstat{font-size:12px;color:var(--mut);margin-top:8px;min-height:18px}
-@media(max-width:900px){main{grid-template-columns:1fr;height:auto}.stage{height:60vh}}
-</style>
-</head>
-<body>
-<header>
-  <div class="logo"></div>
-  <div><h1>GRIDLOCK <small>· City Traffic Simulation</small></h1></div>
-  <div class="sp"></div>
-  <div class="live">SIM <b id="clock">00:00</b> · <span id="fps">60</span> fps</div>
-</header>
-<main>
-  <div class="stage">
-    <canvas id="c"></canvas>
-    <div class="legend">Car speed <span>stopped</span><i></i><span>free flow</span></div>
-  </div>
-  <aside>
-    <div class="card">
-      <h2>Traffic-light algorithm</h2>
-      <div class="seg" id="modes">
-        <button data-m="fixed" class="on">Fixed timer</button>
-        <button data-m="adaptive">Adaptive</button>
-        <button data-m="wave">Green wave</button>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Gridlock: an interactive city traffic simulation with car-following physics, routed trips, pedestrians and four traffic-signal control strategies." />
+    <meta name="theme-color" content="#0b1016" />
+    <title>Gridlock · City Traffic Simulation</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"><i></i><i></i><i></i></span>
+        <h1>GRIDLOCK <small>City Traffic Simulation</small></h1>
       </div>
-      <p class="desc" id="mdesc"></p>
-      <label>Traffic density <span id="vd">14 /min</span></label>
-      <input id="dens" type="range" min="4" max="34" value="14">
-      <label>Simulation speed <span id="vs">1×</span></label>
-      <input id="spd" type="range" min="1" max="8" value="1">
-      <div class="chk"><input type="checkbox" id="peds" checked><label for="peds" style="margin:0;color:var(--ink)">Pedestrians at crosswalks</label></div>
-      <div class="chk"><input type="checkbox" id="heat" checked><label for="heat" style="margin:0;color:var(--ink)">Colour cars by speed</label></div>
-      <div class="row"><button class="btn" id="pause">Pause</button><button class="btn" id="reset">Reset</button></div>
-    </div>
-    <div class="card">
-      <h2>Live metrics</h2>
-      <div class="grid2">
-        <div class="stat"><b id="s_speed">0</b><span>avg speed (km/h)</span></div>
-        <div class="stat"><b id="s_thr">0</b><span>cars / min out</span></div>
-        <div class="stat"><b id="s_trip">–</b><span>avg trip (s)</span></div>
-        <div class="stat"><b id="s_wait">–</b><span>avg time stopped (s)</span></div>
-        <div class="stat"><b id="s_on">0</b><span>on road · <i id="s_stop">0</i> stopped</span></div>
-        <div class="stat"><b id="s_conf">0</b><span>near-collisions</span></div>
-        <div class="stat"><b id="s_ped">0</b><span>pedestrians crossed</span></div>
-        <div class="stat"><b id="s_pw">–</b><span>avg ped wait (s)</span></div>
+      <div class="topbar-status">
+        <span class="chip" id="runState" data-state="ready">Ready</span>
+        <span class="chip level" id="level" data-level="idle" title="Network state">No traffic</span>
+        <span class="clock" aria-label="Simulated time">SIM <b id="clock">00:00</b></span>
+        <span class="fps"><b id="fps">–</b> fps</span>
       </div>
-      <canvas id="spark"></canvas>
-    </div>
-    <div class="card">
-      <h2>Compare efficiency</h2>
-      <p class="desc" style="margin-top:0">Runs all three algorithms headless for 3 simulated minutes with identical traffic and compares the results.</p>
-      <div class="row"><button class="btn pri" id="bench">Run benchmark</button></div>
-      <div id="bstat"></div>
-      <table id="btab" style="display:none">
-        <thead><tr><th>Algorithm</th><th>Out/min</th><th>Trip s</th><th>Stop s</th><th>Ped s</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </aside>
-</main>
+    </header>
 
-<script>
-"use strict";
-/* ---------------- world constants ---------------- */
-const WW=900, WH=600, W=22, L=11, CAR_L=14, CAR_W=7, STOP=W+9;
-const VX=[200,450,700], HY=[150,300,450];
-const VMAX=80, ACC=55, DEC=150, KMH=0.45;
-const MODES={
-  fixed:{name:'Fixed timer',desc:'Every junction cycles on a fixed 10 s green / 2 s amber schedule, blind to demand.'},
-  adaptive:{name:'Adaptive',desc:'Sensors count the queue on each approach. Green is held while cars arrive and switched as soon as the other road has demand.'},
-  wave:{name:'Green wave',desc:'Fixed timing, but junctions are offset so east–west platoons catch consecutive greens.'}
-};
-function rng(seed){let s=seed>>>0;return()=>{s=(s+0x6D2B79F5)>>>0;let t=s;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+    <main class="layout">
+      <section class="stage" aria-label="Simulation view">
+        <canvas id="world" role="img" aria-label="Top-down map of a 3 by 3 grid of signalised junctions with moving vehicles and pedestrians"></canvas>
+        <div class="overlay" id="intro">
+          <p class="overlay-title">Nine junctions, one city grid.</p>
+          <p>Vehicles follow routed trips, keep safe gaps, yield on permissive left turns and stop for pedestrians.</p>
+          <button class="btn pri" id="introStart" type="button"><i data-lucide="play"></i>Start simulation</button>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span>Speed</span><span>stopped</span><span class="ramp"></span><span>50 km/h</span>
+          <span class="sep"></span><span class="ring"></span><span>queue</span>
+        </div>
+        <div class="hint">Click a junction to inspect it</div>
+        <div class="error" id="error" role="alert" hidden></div>
+      </section>
 
-/* ---------------- simulation core ---------------- */
-class Sim{
-  constructor(mode,seed,density,peds){
-    this.mode=mode;this.rand=rng(seed);this.density=density;this.pedsOn=peds;
-    this.t=0;this.cars=[];this.peds=[];this.nid=1;
-    this.exited=0;this.sumTrip=0;this.sumStop=0;this.conflicts=0;this.pairs=new Set();
-    this.exitTimes=[];this.pedDone=0;this.pedWait=0;this.pedTimer=1;
-    this.history=[];this.histT=0;
-    this.ints=[];
-    for(let j=0;j<3;j++)for(let i=0;i<3;i++){
-      const it={i,j,cx:VX[i],cy:HY[j],phase:0,stage:'g',t:0,dem:[0,0]};
-      if(mode==='wave'){ for(let k=0;k<i*31;k++) this.lightStep(it,0.1,true); }
-      this.ints.push(it);
-    }
-    this.entries=[];
-    for(let j=0;j<3;j++){
-      this.entries.push({x:-24,y:HY[j]+L,dx:1,dy:0},{x:WW+24,y:HY[j]-L,dx:-1,dy:0});
-    }
-    for(let i=0;i<3;i++){
-      this.entries.push({x:VX[i]-L,y:-24,dx:0,dy:1},{x:VX[i]+L,y:WH+24,dx:0,dy:-1});
-    }
-  }
-  lightState(it,axis){
-    if(it.stage==='ar')return 'r';
-    if(axis!==it.phase)return 'r';
-    return it.stage==='g'?'g':'y';
-  }
-  lightStep(it,dt,forceFixed){
-    it.t+=dt;
-    const adaptive=this.mode==='adaptive'&&!forceFixed;
-    if(it.stage==='g'){
-      if(!adaptive){ if(it.t>=10){it.stage='y';it.t=0;} }
-      else{
-        const cur=it.dem[it.phase],oth=it.dem[1-it.phase];
-        if(it.t>=4&&((cur<0.5&&oth>0)||(it.t>=22&&oth>0)||(oth>cur*2.5&&it.t>=9))){it.stage='y';it.t=0;}
-      }
-    }else if(it.stage==='y'){ if(it.t>=2){it.stage='ar';it.t=0;} }
-    else if(it.t>=0.8){it.phase=1-it.phase;it.stage='g';it.t=0;}
-  }
-  step(dt){
-    this.t+=dt;
-    // spawn
-    const p=this.density/60*dt;
-    for(const e of this.entries){
-      if(this.rand()<p){
-        let free=true;
-        for(const c of this.cars){ if(Math.abs(c.x-e.x)<CAR_L*2.2&&Math.abs(c.y-e.y)<CAR_L*2.2){free=false;break;} }
-        if(free) this.cars.push({id:this.nid++,x:e.x,y:e.y,dx:e.dx,dy:e.dy,v:VMAX*0.7,vf:0.82+this.rand()*0.22,
-          born:this.t,stopT:0,lastInt:-1,turn:null,hue:Math.floor(this.rand()*360),nk:-1,na:1e9});
-      }
-    }
-    // reset demand
-    for(const it of this.ints){it.dem[0]=0;it.dem[1]=0;}
-    const cars=this.cars;
-    for(const c of cars){
-      const dx=c.dx,dy=c.dy,pp=c.x*dx+c.y*dy,axis=dx!==0?0:1;
-      // next intersection
-      let nk=-1,na=1e9;
-      for(let k=0;k<9;k++){
-        const it=this.ints[k];
-        const perp=dx!==0?Math.abs(c.y-it.cy):Math.abs(c.x-it.cx);
-        if(perp>W)continue;
-        const a=it.cx*dx+it.cy*dy-pp;
-        if(a>-(W+12)&&a<na){na=a;nk=k;}
-      }
-      c.nk=nk;c.na=na;
-      let gap=1e9;
-      if(nk>=0){
-        const it=this.ints[nk],front=pp+CAR_L/2,stopS=it.cx*dx+it.cy*dy-STOP;
-        if(c.lastInt!==nk){
-          if(front>=stopS){
-            c.lastInt=nk;
-            const r=this.rand();
-            let nd=null,ts=0;
-            const cs=it.cx*dx+it.cy*dy;
-            if(r<0.2){nd=[-dy,dx];ts=cs-L;}          // right
-            else if(r<0.4){nd=[dy,-dx];ts=cs+L;}      // left
-            c.turn=nd?{dx:nd[0],dy:nd[1],s:ts}:null;
-          }else{
-            const st=this.lightState(it,axis),sg=stopS-front;
-            if(st!=='g'&&na<260) it.dem[axis]+= c.v<12?1:0.5;
-            if(st==='r'||(st==='y'&&sg>c.v*c.v/(2*6)+2)) gap=Math.min(gap,sg-0.5);
-          }
-        }
-      }
-      // leader
-      const q=dx!==0?c.y:c.x;
-      for(const o of cars){
-        if(o===c||o.dx!==dx||o.dy!==dy)continue;
-        const oq=dx!==0?o.y:o.x;
-        if(Math.abs(oq-q)>4)continue;
-        const po=o.x*dx+o.y*dy;
-        if(po<=pp)continue;
-        const g=(po-pp)-CAR_L-3;
-        if(g<gap)gap=g;
-      }
-      c.gap=gap;
-    }
-    for(const c of cars){
-      const vt=Math.max(0,Math.min(VMAX*c.vf,c.gap*1.8));
-      const dv=vt-c.v;
-      c.v+=Math.max(-DEC*dt,Math.min(ACC*dt,dv));
-      if(c.v<0)c.v=0;
-      c.x+=c.dx*c.v*dt;c.y+=c.dy*c.v*dt;
-      if(c.v<3)c.stopT+=dt;
-      if(c.turn){
-        const ps=c.x*c.dx+c.y*c.dy;
-        if(ps>=c.turn.s){c.dx=c.turn.dx;c.dy=c.turn.dy;c.turn=null;}
-      }
-    }
-    // conflicts (crossing paths)
-    for(let a=0;a<cars.length;a++){
-      const A=cars[a];
-      for(let b=a+1;b<cars.length;b++){
-        const B=cars[b];
-        if(A.dx===B.dx&&A.dy===B.dy)continue;
-        if(Math.abs(A.x-B.x)>8||Math.abs(A.y-B.y)>8)continue;
-        if(A.dx===-B.dx&&A.dy===-B.dy)continue;
-        const key=A.id<B.id?A.id*100000+B.id:B.id*100000+A.id;
-        if(!this.pairs.has(key)){this.pairs.add(key);this.conflicts++;}
-      }
-    }
-    // exits
-    for(let i=cars.length-1;i>=0;i--){
-      const c=cars[i];
-      if(c.x<-40||c.x>WW+40||c.y<-40||c.y>WH+40){
-        this.exited++;this.sumTrip+=this.t-c.born;this.sumStop+=c.stopT;this.exitTimes.push(this.t);
-        cars.splice(i,1);
-      }
-    }
-    if(this.pairs.size>4000)this.pairs.clear();
-    // lights
-    for(const it of this.ints)this.lightStep(it,dt);
-    // pedestrians
-    if(this.pedsOn){
-      this.pedTimer-=dt;
-      if(this.pedTimer<=0&&this.peds.length<14){
-        this.pedTimer=1.6+this.rand()*2;
-        const k=Math.floor(this.rand()*9),arm=Math.floor(this.rand()*4);
-        this.peds.push({k,arm,prog:0,dir:this.rand()<0.5?1:-1,state:'w',wait:0});
-      }
-      const U=[[1,0],[-1,0],[0,1],[0,-1]];
-      for(let i=this.peds.length-1;i>=0;i--){
-        const pd=this.peds[i],u=U[pd.arm],axis=u[0]!==0?0:1,it=this.ints[pd.k];
-        if(pd.state==='w'){
-          pd.wait+=dt;
-          if(this.lightState(it,axis)==='r'&&it.t>0.3&&this.carsClear(it,u)){pd.state='c';}
-        }else{
-          pd.prog+=dt*26/(2*W+6);
-          if(pd.prog>=1){this.pedDone++;this.pedWait+=pd.wait;this.peds.splice(i,1);}
-        }
-      }
-    }else this.peds.length=0;
-    // history
-    this.histT+=dt;
-    if(this.histT>=1){
-      this.histT=0;
-      let s=0;for(const c of cars)s+=c.v;
-      this.history.push(cars.length?s/cars.length/VMAX:0);
-      if(this.history.length>120)this.history.shift();
-    }
-  }
-  carsClear(it,u){
-    const bx=it.cx+u[0]*(W+4.5),by=it.cy+u[1]*(W+4.5);
-    for(const c of this.cars)if(Math.abs(c.x-bx)<14&&Math.abs(c.y-by)<14)return false;
-    return true;
-  }
-  metrics(){
-    let s=0,stopped=0;
-    for(const c of this.cars){s+=c.v;if(c.v<3)stopped++;}
-    const n=this.cars.length,win=Math.min(60,this.t||1);
-    let thr=0;for(let i=this.exitTimes.length-1;i>=0&&this.exitTimes[i]>this.t-60;i--)thr++;
-    return{
-      speed:n?s/n*KMH:0,thr:thr*60/win,on:n,stopped,
-      trip:this.exited?this.sumTrip/this.exited:null,
-      wait:this.exited?this.sumStop/this.exited:null,
-      conf:this.conflicts,ped:this.pedDone,pw:this.pedDone?this.pedWait/this.pedDone:null,
-      thrTotal:this.exited/(this.t/60||1)
-    };
-  }
-}
+      <aside class="panel">
+        <section class="card">
+          <h2>Simulation</h2>
+          <div class="row">
+            <button class="btn pri" id="play" type="button"><i data-lucide="play"></i><span>Start</span></button>
+            <button class="btn icon" id="step" type="button" title="Advance one second (→)" aria-label="Advance one second"><i data-lucide="step-forward"></i></button>
+            <button class="btn icon" id="reset" type="button" title="Reset (R)" aria-label="Reset simulation"><i data-lucide="rotate-ccw"></i></button>
+          </div>
+          <label class="lbl" id="speedLbl">Simulation speed</label>
+          <div class="seg seg5" id="speed" role="radiogroup" aria-labelledby="speedLbl">
+            <button type="button" data-v="0.5">½×</button>
+            <button type="button" data-v="1" class="on">1×</button>
+            <button type="button" data-v="2">2×</button>
+            <button type="button" data-v="4">4×</button>
+            <button type="button" data-v="8">8×</button>
+          </div>
+          <label class="lbl" for="seed">Random seed <span class="hintx">same seed, same traffic</span></label>
+          <input id="seed" type="number" min="1" max="999999" value="1337" inputmode="numeric" />
+        </section>
 
-/* ---------------- rendering ---------------- */
-const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-let scale=1,ox=0,oy=0,dpr=1;
-function resize(){
-  const r=cv.parentElement.getBoundingClientRect();dpr=Math.min(2,devicePixelRatio||1);
-  cv.width=r.width*dpr;cv.height=r.height*dpr;
-  scale=Math.min(cv.width/WW,cv.height/WH);ox=(cv.width-WW*scale)/2;oy=(cv.height-WH*scale)/2;
-}
-addEventListener('resize',resize);
-function drawWorld(sim,heat){
-  ctx.setTransform(1,0,0,1,0,0);
-  ctx.fillStyle='#0e141b';ctx.fillRect(0,0,cv.width,cv.height);
-  ctx.setTransform(scale,0,0,scale,ox,oy);
-  // city blocks
-  ctx.fillStyle='#131b24';ctx.fillRect(0,0,WW,WH);
-  const xs=[-100,...VX,1000],ys=[-100,...HY,700];
-  for(let a=0;a<xs.length-1;a++)for(let b=0;b<ys.length-1;b++){
-    const x0=xs[a]+W+8,x1=xs[a+1]-W-8,y0=ys[b]+W+8,y1=ys[b+1]-W-8;
-    ctx.fillStyle='#17212c';ctx.fillRect(x0,y0,x1-x0,y1-y0);
-    ctx.fillStyle='#1b2733';
-    for(let bx=x0+10;bx<x1-34;bx+=44)for(let by=y0+10;by<y1-34;by+=44){ctx.fillRect(bx,by,34,34);}
-  }
-  // roads
-  ctx.fillStyle='#232d39';
-  for(const x of VX)ctx.fillRect(x-W,0,2*W,WH);
-  for(const y of HY)ctx.fillRect(0,y-W,WW,2*W);
-  ctx.strokeStyle='#3a4757';ctx.lineWidth=1.2;ctx.setLineDash([9,9]);
-  for(const x of VX){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,WH);ctx.stroke();}
-  for(const y of HY){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(WW,y);ctx.stroke();}
-  ctx.setLineDash([]);
-  // intersection boxes + crosswalks + signals
-  const U=[[1,0],[-1,0],[0,1],[0,-1]];
-  for(const it of sim.ints){
-    ctx.fillStyle='#262f3b';ctx.fillRect(it.cx-W,it.cy-W,2*W,2*W);
-    for(let a=0;a<4;a++){
-      const u=U[a],v=[-u[1],u[0]],bx=it.cx+u[0]*(W+4.5),by=it.cy+u[1]*(W+4.5);
-      ctx.strokeStyle='#4a586a';ctx.lineWidth=1;
-      for(let s=-W+2;s<W;s+=5){
-        ctx.beginPath();ctx.moveTo(bx+v[0]*s-u[0]*3,by+v[1]*s-u[1]*3);ctx.lineTo(bx+v[0]*s+u[0]*3,by+v[1]*s+u[1]*3);ctx.stroke();
-      }
-      // stop line + lamp
-      const axis=u[0]!==0?0:1,st=sim.lightState(it,axis);
-      const sx=it.cx+u[0]*STOP,sy=it.cy+u[1]*STOP;
-      ctx.strokeStyle=st==='g'?'#2ecc71':st==='y'?'#ffd23f':'#ff4d4d';ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(sx-v[0]*W+0,sy-v[1]*W);ctx.lineTo(sx,sy);ctx.stroke();
-      // lamp on the right curb of approach (cars come from direction u, heading -u)
-      const rx=sx+u[0]*3-v[0]*(W-3),ry=sy+u[1]*3-v[1]*(W-3);
-      ctx.fillStyle='#0b1016';ctx.beginPath();ctx.arc(rx,ry,5,0,7);ctx.fill();
-      ctx.fillStyle=st==='g'?'#2ecc71':st==='y'?'#ffd23f':'#ff4d4d';
-      ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=8;ctx.beginPath();ctx.arc(rx,ry,3.2,0,7);ctx.fill();ctx.shadowBlur=0;
-    }
-    // demand marker for adaptive mode
-    if(sim.mode==='adaptive'){
-      ctx.fillStyle='#4cc3ff55';ctx.font='7px ui-monospace,monospace';ctx.textAlign='center';
-      ctx.fillText(it.dem[0].toFixed(0)+'↔ '+it.dem[1].toFixed(0)+'↕',it.cx,it.cy+3);
-    }
-  }
-  // cars
-  for(const c of sim.cars){
-    ctx.save();ctx.translate(c.x,c.y);ctx.rotate(Math.atan2(c.dy,c.dx));
-    ctx.fillStyle=heat?`hsl(${Math.min(120,c.v/VMAX*130)},75%,55%)`:`hsl(${c.hue},60%,60%)`;
-    ctx.beginPath();ctx.roundRect(-CAR_L/2,-CAR_W/2,CAR_L,CAR_W,2);ctx.fill();
-    ctx.fillStyle='#0b101666';ctx.fillRect(1,-CAR_W/2+1,3.5,CAR_W-2);
-    if(c.v<3){ctx.fillStyle='#ff4d4d';ctx.fillRect(-CAR_L/2,-CAR_W/2+.5,1.5,2);ctx.fillRect(-CAR_L/2,CAR_W/2-2.5,1.5,2);}
-    ctx.restore();
-  }
-  // pedestrians
-  for(const pd of sim.peds){
-    const u=U[pd.arm],v=[-u[1],u[0]],it=sim.ints[pd.k];
-    const bx=it.cx+u[0]*(W+4.5),by=it.cy+u[1]*(W+4.5);
-    const s0=pd.state==='w'?-W-3:-W-3+pd.prog*(2*W+6);
-    const s=pd.dir>0?s0:-s0;
-    ctx.fillStyle=pd.state==='w'?'#ffb020':'#fff';
-    ctx.beginPath();ctx.arc(bx+v[0]*s,by+v[1]*s,2.2,0,7);ctx.fill();
-  }
-}
-const sp=document.getElementById('spark'),sctx=sp.getContext('2d');
-function drawSpark(h){
-  const w=sp.clientWidth,hh=sp.clientHeight;sp.width=w*dpr;sp.height=hh*dpr;sctx.setTransform(dpr,0,0,dpr,0,0);
-  sctx.clearRect(0,0,w,hh);
-  sctx.strokeStyle='#243040';sctx.beginPath();sctx.moveTo(0,hh-.5);sctx.lineTo(w,hh-.5);sctx.stroke();
-  if(h.length<2)return;
-  sctx.strokeStyle='#ffb020';sctx.lineWidth=1.6;sctx.beginPath();
-  h.forEach((v,i)=>{const x=i/119*w,y=hh-4-v*(hh-8);i?sctx.lineTo(x,y):sctx.moveTo(x,y);});
-  sctx.stroke();
-  sctx.fillStyle='#8796a8';sctx.font='10px ui-monospace,monospace';sctx.fillText('avg speed · last 2 min',4,10);
-}
+        <section class="card">
+          <h2>Signal control</h2>
+          <div class="seg seg2" id="modes" role="radiogroup" aria-label="Signal control strategy">
+            <button type="button" data-m="fixed" class="on">Fixed timer</button>
+            <button type="button" data-m="wave">Green wave</button>
+            <button type="button" data-m="actuated">Actuated</button>
+            <button type="button" data-m="pressure">Max-pressure</button>
+          </div>
+          <p class="desc" id="mdesc"></p>
+          <div class="sliders" id="timing"></div>
+        </section>
 
-/* ---------------- UI wiring ---------------- */
-const $=id=>document.getElementById(id);
-let mode='fixed',sim,paused=false,speed=1,SEED=1337;
-function build(){sim=new Sim(mode,SEED,+$('dens').value,$('peds').checked);}
-function setMode(m){
-  mode=m;document.querySelectorAll('#modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
-  $('mdesc').textContent=MODES[m].desc;build();
-}
-document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
-$('dens').oninput=e=>{$('vd').textContent=e.target.value+' /min';sim.density=+e.target.value;};
-$('spd').oninput=e=>{speed=+e.target.value;$('vs').textContent=speed+'×';};
-$('peds').onchange=e=>{sim.pedsOn=e.target.checked;};
-$('pause').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause';};
-$('reset').onclick=()=>build();
+        <section class="card">
+          <h2>Demand</h2>
+          <label class="lbl" for="demand">Vehicles entering <span class="val" id="demandV"></span></label>
+          <input id="demand" type="range" min="5" max="90" step="5" value="45" />
+          <label class="lbl" for="ew">East–west share <span class="val" id="ewV"></span></label>
+          <input id="ew" type="range" min="20" max="80" step="5" value="50" />
+          <label class="toggle"><input type="checkbox" id="peds" checked /> Pedestrians</label>
+          <label class="lbl" for="pedRate">Pedestrian arrivals <span class="val" id="pedRateV"></span></label>
+          <input id="pedRate" type="range" min="2" max="40" step="2" value="12" />
+          <label class="toggle"><input type="checkbox" id="smart" /> Congestion-aware routing</label>
+          <label class="toggle"><input type="checkbox" id="heat" checked /> Colour vehicles by speed</label>
+        </section>
 
-function fmt(v,d=1){return v==null?'–':v.toFixed(d);}
-function updateStats(){
-  const m=sim.metrics();
-  $('s_speed').textContent=fmt(m.speed,0);$('s_thr').textContent=fmt(m.thr,0);
-  $('s_trip').textContent=fmt(m.trip);$('s_wait').textContent=fmt(m.wait);
-  $('s_on').textContent=m.on;$('s_stop').textContent=m.stopped;$('s_conf').textContent=m.conf;
-  $('s_ped').textContent=m.ped;$('s_pw').textContent=fmt(m.pw);
-  const t=Math.floor(sim.t);$('clock').textContent=String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
-  drawSpark(sim.history);
-}
+        <section class="card">
+          <h2>Live metrics</h2>
+          <div class="stats">
+            <div class="stat"><b id="m_speed">0</b><span>avg speed km/h</span></div>
+            <div class="stat"><b id="m_thr">0</b><span>exits / min</span></div>
+            <div class="stat"><b id="m_delay">–</b><span>avg delay s</span></div>
+            <div class="stat"><b id="m_stop">–</b><span>avg time stopped s</span></div>
+            <div class="stat"><b id="m_on">0</b><span>on road · <em id="m_stopped">0</em> stopped</span></div>
+            <div class="stat"><b id="m_pend">0</b><span>waiting to enter</span></div>
+            <div class="stat"><b id="m_ped">0</b><span>pedestrians crossed</span></div>
+            <div class="stat"><b id="m_pw">–</b><span>avg ped wait s</span></div>
+          </div>
+          <div class="spark">
+            <div class="spark-h"><span>Avg speed</span><span>last 3 min</span></div>
+            <canvas id="sparkSpeed" height="44"></canvas>
+            <div class="spark-h"><span>Vehicles stopped</span></div>
+            <canvas id="sparkStop" height="44"></canvas>
+          </div>
+          <p class="safety" id="safety"></p>
+        </section>
 
-let last=performance.now(),acc=0,frames=0,fpsT=0,statT=0;
-const DT=1/30;
-function loop(now){
-  const rd=Math.min(0.1,(now-last)/1000);last=now;
-  frames++;fpsT+=rd;if(fpsT>=1){$('fps').textContent=frames;frames=0;fpsT=0;}
-  if(!paused){acc+=rd*speed;let n=0;while(acc>=DT&&n<40){sim.step(DT);acc-=DT;n++;}if(n>=40)acc=0;}
-  drawWorld(sim,$('heat').checked);
-  statT+=rd;if(statT>0.25){statT=0;updateStats();}
-  requestAnimationFrame(loop);
-}
+        <section class="card">
+          <h2>Junction</h2>
+          <div id="inspector"><p class="empty">Click a junction on the map to see its signal phase and queues.</p></div>
+          <div class="hot" id="hotspots"></div>
+        </section>
 
-/* ---------------- benchmark ---------------- */
-$('bench').onclick=async()=>{
-  const btn=$('bench'),tb=document.querySelector('#btab tbody');
-  btn.disabled=true;tb.innerHTML='';$('btab').style.display='none';
-  const res=[],dens=+$('dens').value,peds=$('peds').checked;
-  for(const m of Object.keys(MODES)){
-    $('bstat').textContent='Running '+MODES[m].name+'…';
-    await new Promise(r=>setTimeout(r,30));
-    const s=new Sim(m,SEED,dens,peds);
-    for(let i=0;i<1800;i++)s.step(0.1);
-    // discard warm-up by reporting totals after 3 min
-    res.push({m,x:s.metrics()});
-  }
-  const best=(k,low)=>{const v=res.map(r=>r.x[k]).filter(v=>v!=null);return low?Math.min(...v):Math.max(...v);};
-  const bt=best('thrTotal',false),bp=best('trip',true),bw=best('wait',true),bpw=best('pw',true);
-  for(const r of res){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${MODES[r.m].name}</td><td class="${r.x.thrTotal===bt?'best':''}">${fmt(r.x.thrTotal,1)}</td><td class="${r.x.trip===bp?'best':''}">${fmt(r.x.trip)}</td><td class="${r.x.wait===bw?'best':''}">${fmt(r.x.wait)}</td><td class="${r.x.pw===bpw?'best':''}">${fmt(r.x.pw)}</td>`;
-    tb.appendChild(tr);
-  }
-  $('btab').style.display='table';
-  const w=res.slice().sort((a,b)=>a.x.wait-b.x.wait)[0];
-  $('bstat').textContent='Lowest time stopped: '+MODES[w.m].name+' (density '+dens+'/min, 3 min, same random seed).';
-  btn.disabled=false;
-};
-
-resize();setMode('fixed');
-// expose for tests
-window.__sim=()=>sim;
-requestAnimationFrame(loop);
-</script>
-</body>
+        <section class="card">
+          <h2>Compare controllers</h2>
+          <p class="desc first">Runs all four strategies headless with your current demand, timing and seed: a 1 min warm-up, then 5 min measured.</p>
+          <div class="row">
+            <button class="btn pri" id="bench" type="button"><i data-lucide="gauge"></i><span>Run benchmark</span></button>
+          </div>
+          <div class="progress" id="bprog" hidden><i></i></div>
+          <p class="bstat" id="bstat" aria-live="polite"></p>
+          <div class="tablewrap">
+            <table id="btab" hidden>
+              <thead>
+                <tr><th>Controller</th><th>Delay s</th><th>Stopped s</th><th>Exits/min</th><th>Ped s</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </aside>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
 </html>
