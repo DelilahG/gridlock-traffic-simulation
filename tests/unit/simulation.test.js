@@ -254,3 +254,19 @@ test('kerb stops leave room for a queued vehicle to clear the junction behind th
   }
   assert.ok(checked > 10);
 });
+
+test('calibration: queue discharge matches Addis Ababa start-up lost time and saturation flow', async () => {
+  const { queueDischarge } = await import('../../src/sim/calibration.js');
+  const q = queueDischarge();
+  // targets: 2.51 s start-up lost time (AAU thesis), 1900 veh/h saturation flow (Frontiers 2024)
+  assert.ok(Math.abs(q.startUpLostTime - 2.51) < 0.3, `lost time ${q.startUpLostTime}`);
+  assert.ok(Math.abs(q.saturationFlow - 1900) < 120, `saturation flow ${q.saturationFlow}`);
+});
+
+test('desired speeds follow the observed Addis distribution within legal limits', () => {
+  const s = new Simulation({ seed: 3 });
+  const v = Array.from({ length: 4000 }, () => (s.desiredSpeed() / 4) * 3.6);
+  const mean = v.reduce((a, b) => a + b, 0) / v.length;
+  assert.ok(Math.min(...v) >= 35 && Math.max(...v) <= 70);
+  assert.ok(mean > 50 && mean < 58, `mean ${mean}`);
+});

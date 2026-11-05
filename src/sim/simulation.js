@@ -4,10 +4,12 @@ import {
   DIRS,
   DT,
   IDM,
+  DESIRED_SPEED,
   LEFT_TURN_GAP,
+  MAX_DESIRED_SPEED,
+  PX_PER_M,
   PED,
   ROAD_HALF,
-  SPEED_LIMIT,
   STOPPED_SPEED,
   axisOf,
   opposite,
@@ -186,7 +188,7 @@ export class Simulation {
     const exit = this.pickDestination(e);
     const route = this.routeFor(link, exit);
     if (!route) return false;
-    const v0 = SPEED_LIMIT * (van ? 0.85 : taxi ? 0.95 : 0.88 + this.rand() * 0.22);
+    const v0 = this.desiredSpeed() * (van ? 0.9 : 1);
     const u = {
       id: this.nextId++,
       kind: taxi ? 'taxi' : van ? 'van' : 'car',
@@ -216,6 +218,14 @@ export class Simulation {
     this.vehicles.push(u);
     this.stats.spawned++;
     return true;
+  }
+
+  // Desired speed from the observed Addis Ababa distribution (Box–Muller normal, clamped).
+  desiredSpeed() {
+    const { meanKmh, sdKmh, minKmh, maxKmh } = DESIRED_SPEED;
+    const z = Math.sqrt(-2 * Math.log(1 - this.rand())) * Math.cos(2 * Math.PI * this.rand());
+    const kmh = Math.min(maxKmh, Math.max(minKmh, meanKmh + sdKmh * z));
+    return (kmh / 3.6) * PX_PER_M;
   }
 
   // Choose kerbside stops along a taxi's route: link id -> { s, dwell, done }.
@@ -254,10 +264,21 @@ export class Simulation {
     return true;
   }
 
+  /**
+   * "Don't block the box", as a jam-compaction check: if every vehicle on the
+   * exit link came to rest bumper-to-bumper, front to back, at the earliest
+   * point it could stop (the stop line, the back of the queue ahead, or its own
+   * kerb stop if it is a taxi still due to pull over), would there still be
+   * room for this vehicle past the crosswalk?
+   */
   downstreamSpace(conn, u) {
     const L = conn.to;
-    const last = L.vehicles[L.vehicles.length - 1];
-    let rear = last ? last.s - last.len : L.len;
+    let rear = L.len;
+    for (const w of L.vehicles) {
+      const st = this.pendingCurb(w, L);
+      const front = st ? Math.min(rear, st.s) : rear;
+      rear = front - w.len - IDM.s0;
+    }
     for (const c of L.inbound) {
       for (const w of c.vehicles) rear -= w.len + IDM.s0;
       const cm = c.from.committed;
@@ -278,7 +299,7 @@ export class Simulation {
     const oppGreen = ctrl.light(axisOf(opp.dir)) === 'g';
     for (const w of opp.vehicles) {
       const d = opp.len - w.s;
-      if (d > SPEED_LIMIT * 1.15 * LEFT_TURN_GAP) break;
+      if (d > MAX_DESIRED_SPEED * LEFT_TURN_GAP) break;
       if (opp.committed === w) return false;
       if (this.nextConnector(w).turn === 'left') continue;
       if (!oppGreen) continue;
@@ -330,15 +351,15 @@ export class Simulation {
   /* ---------------- vehicle dynamics ---------------- */
 
   siblingGap(conn, offset) {
-    // Vehicles on other movements from the same approach still occupy the shared
-    // crosswalk segment until their rear clears it.
+    // Vehicles on other movements from the same approach lane block this one
+    // until their rear has passed the point where the two paths separate.
     let gap = Infinity;
     let lv = 0;
     for (const sib of conn.siblings) {
       const w = sib.vehicles[sib.vehicles.length - 1];
       if (!w) continue;
       const rear = w.s - w.len;
-      if (rear < CROSSWALK + 2) {
+      if (rear < conn.overlap.get(sib.id) + 1) {
         const g = offset + rear;
         if (g < gap && g > -w.len) ((gap = g), (lv = w.v));
       }
@@ -390,6 +411,11 @@ export class Simulation {
         } else {
           acc = Math.min(acc, this.lookahead(u, P));
         }
+        // Perception-reaction time of the first driver in the queue when the light changes.
+        if (k === 0 && P.kind === 'link' && u.v < STOPPED_SPEED && acc > 0 && IDM.reaction > 0) {
+          u.react = (u.react || 0) + DT;
+          if (u.react < IDM.reaction) acc = Math.min(acc, 0);
+        } else if (u.v >= STOPPED_SPEED) u.react = 0;
         if (u.curb && P.kind === 'link') {
           const st = this.pendingCurb(u, P);
           if (st) acc = Math.min(acc, idmAcceleration(u.v, u.v0, st.s - u.s, 0, 1));

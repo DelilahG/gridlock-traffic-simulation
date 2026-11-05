@@ -153,6 +153,7 @@ export function buildNetwork() {
           arms: [opposite(dIn), dOut], // crosswalks this movement passes over
           conflicts: [],
           siblings: [],
+          overlap: new Map(), // sibling id -> arc length over which the two paths overlap
         };
         connectors.push(c);
         J.connectors.push(c);
@@ -166,6 +167,18 @@ export function buildNetwork() {
         if (a === b) continue;
         if (a.dIn === b.dIn) {
           a.siblings.push(b);
+          // Movements from the same lane share a start and separate gradually;
+          // find how far along they stay closer than a car's width.
+          let s = 0;
+          const pa = {};
+          const pb = {};
+          while (s < Math.min(a.len, b.len)) {
+            a.path.pointAt(s, pa);
+            b.path.pointAt(s, pb);
+            if (Math.hypot(pa.x - pb.x, pa.y - pb.y) > CONFLICT_DISTANCE) break;
+            s += 0.5;
+          }
+          a.overlap.set(b.id, s);
           continue;
         }
         if (minPathDistance(a.path, b.path) < CONFLICT_DISTANCE) a.conflicts.push(b);
