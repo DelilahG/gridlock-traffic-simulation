@@ -86,7 +86,8 @@ The live demo is served by GitHub Pages from the `gh-pages` branch.
 
 ```bash
 npm run lint       # ESLint
-npm test           # 32 unit / simulation tests (Node test runner)
+npm test           # 39 unit / simulation tests (Node test runner)
+npm run calibrate  # queue-discharge calibration vs the Addis Ababa targets
 npm run test:e2e   # 10 Playwright browser tests (builds and serves the app)
 npm run check      # all of the above plus the production build
 ```
@@ -111,37 +112,67 @@ Browser tests use the preinstalled Microsoft Edge on Windows, so nothing needs t
 - *Simulation, other*: determinism by seed, vehicle conservation, saturation behaviour without NaNs, live demand, pedestrian and timing changes, and a per-step performance budget.
 - *Browser*: ready state, start/pause/resume/reset, single step, keyboard shortcuts, mode switching with matching timing controls, live sliders, seed, junction inspector, the full benchmark, mobile layout without horizontal scroll, and no console errors.
 
-Latest local run: lint clean, **37/37** unit tests and **10/10** browser tests passing.
+Latest local run: lint clean, **39/39** unit tests and **10/10** browser tests passing.
+
+## Calibration to Addis Ababa
+
+The model is informed by published Addis Ababa figures where they exist. One part is genuinely calibrated: queue discharge at a signal. Values with no published local source are marked as assumptions.
+
+| Parameter | Model value | Source |
+| --- | --- | --- |
+| Start-up lost time at signals | **2.52 s** (target 2.51 s) | Mean measured at four Addis Ababa signals, [AAU thesis](https://etd.aau.edu.et/items/fa1fdb51-0ff7-4d69-8f26-2b17729a43ee) |
+| Saturation flow | **1,889 veh/h** (target 1,900) | Value used in Addis Ababa intersection studies ([Frontiers 2024](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2024.1366932/full)); no locally measured value was found |
+| Drivers' desired speeds | 56 ± 14 km/h, clipped to 35–70 km/h | Observed mean speed and spread in Addis Ababa, [JHU road safety status summary 2024](https://publichealth.jhu.edu/sites/default/files/2025-02/ENGLISH_ADDIS_ABABA_SSR-1.pdf). 70 km/h is the city's highest legal limit (limits range from 30 to 70 km/h by road type). |
+| Speed limit | 50 km/h | A posted limit on Addis city streets ([JHU 2024](https://publichealth.jhu.edu/sites/default/files/2025-02/ENGLISH_ADDIS_ABABA_SSR-1.pdf), [AAU thesis](https://etd.aau.edu.et/handle/123456789/2448)) |
+| Pedestrian crossing speed | 1.05–1.55 m/s (mean 1.30) | Observed means of 1.27–1.41 m/s at Addis crosswalks ([AAU thesis](https://etd.aau.edu.et/items/a877d381-478c-422a-a8ef-cc3e3cc42a17)) |
+| Minibus taxi share of vehicles | 25% (adjustable) | **Assumption.** Minibus taxis carry about 80% of public-transport demand ([Urban, Planning and Transport Research 2022](https://www.tandfonline.com/doi/full/10.1080/21650020.2022.2086613)), but no share-of-vehicles figure was found. |
+| Taxi dwell time | 3–8 s per stop | **Assumption.** No published measurement was found. |
+| Signal timings, demand | 18 s greens, 45 veh/min | **Assumptions.** No published signal plans or junction counts were found for these junctions. Local studies report long cycles and high delays, for example LOS F at Meskel Square ([Frontiers 2024](https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2024.1366932/full)). |
+
+**How the calibration works.** `src/sim/calibration.js` runs the standard queue-discharge experiment from the Highway Capacity Manual: twelve cars wait at a red light, the light turns green, and the time each car crosses the stop line is recorded. Saturation headway is the mean gap from the fifth car on. Start-up lost time is the extra time the first four cars take beyond that. A grid search over the car-following model's acceleration, desired time gap and the first driver's reaction time found the best fit at 2.0 m/s², 1.0 s and 1.2 s. Run `npm run calibrate` to reproduce it; a unit test keeps it within tolerance.
+
+**What the calibration uncovered.** The experiment exposed a real flaw. The rule stopping cars from entering a junction they can't clear used to measure free space from the current position of the car ahead, even when that car was driving away. It made every other car hesitate at the line and capped a lane at about 1,000 veh/h. It was replaced with a jam-compaction check, which asks whether there would still be room if every vehicle ahead stopped bumper-to-bumper at the earliest point it could. The fix also showed that cars going straight and cars turning left from the same lane overlap for 34 units of their paths, not 11, and the following logic now uses the measured overlap of each pair of paths.
+
+**Plausibility check (not fitted).** Average trip speed in the simulation, compared with travel speeds measured on the Megenagna–CMC corridor ([Springer 2024](https://link.springer.com/article/10.1186/s40068-024-00344-9)):
+
+| Demand (fixed timing) | Simulated average trip speed | Measured in Addis |
+| --- | --- | --- |
+| 15 veh/min | 15.3 km/h | 22.6 km/h midday |
+| 30 veh/min | 13.9 km/h | 16.6 km/h daily average |
+| 45 veh/min (default) | 10.8 km/h | 10.6 km/h peak |
+| 60 veh/min | 8.9 km/h | |
+
+At the default demand the simulated speed matches the measured peak speed closely. In light traffic the model is slower than the real corridor, as expected: it has a signal every 24–62 m, far more often than a real street.
 
 ## Results: does adaptive control help?
 
-Average delay per trip (actual trip time minus free-flow trip time), averaged over 4 seeds, with 1 min warm-up and 5 min measured. Pedestrians are on, at 12/min, and 25% of vehicles are minibus taxis. Lowest delay is in bold; throughput is in exits per minute.
+Average delay per trip (actual trip time minus free-flow trip time), averaged over 4 seeds, with 1 min warm-up and 5 min measured. All calibrated values above are in use, pedestrians arrive at 12/min, and 25% of vehicles are minibus taxis. Lowest delay is in bold; throughput is in exits per minute.
 
 | Scenario | Fixed | Green wave | Actuated | Max-pressure |
 |---|---|---|---|---|
-| Light (15 veh/min) | 34.7 s · 15/min | 34.1 s · 15/min | 23.9 s · 16/min | **22.0 s** · 16/min |
-| Moderate (30) | 37.2 s · 27/min | 39.9 s · 29/min | 30.8 s · 28/min | **29.0 s** · 28/min |
-| Default (45) | 53.8 s · 41/min | 58.6 s · 40/min | 51.1 s · 39/min | **46.7 s** · 41/min |
-| Unbalanced (45, 75% E–W) | 58.5 s · 38/min | 56.7 s · 38/min | 59.7 s · 41/min | **53.5 s** · 38/min |
-| Near saturation (60) | 68.7 s · 39/min | 75.3 s · 38/min | 74.3 s · 39/min | **63.9 s** · 44/min |
+| Light (15 veh/min) | 34.7 s · 14/min | 35.8 s · 14/min | 25.3 s · 16/min | **23.2 s** · 16/min |
+| Moderate (30) | 39.5 s · 26/min | 43.3 s · 27/min | 34.6 s · 30/min | **31.5 s** · 29/min |
+| Default (45) | 55.2 s · 35/min | 55.0 s · 37/min | 51.0 s · 39/min | **50.4 s** · 39/min |
+| Unbalanced (45, 75% E–W) | 60.3 s · 37/min | 57.7 s · 38/min | 55.1 s · 37/min | **52.5 s** · 38/min |
+| Near saturation (60) | **69.3 s** · 42/min | 72.3 s · 37/min | 69.5 s · 42/min | 69.6 s · 40/min |
 
 How much the taxis' kerbside stops cost, at the default load (45 veh/min, same seeds):
 
 | Taxi share | Fixed | Max-pressure | Taxi pick-ups / min |
 |---|---|---|---|
-| 0% | 42.0 s | 31.3 s | 0 |
-| 25% (default) | 53.8 s | 46.7 s | 17.5 |
-| 50% | 70.8 s | 55.3 s | 33.8 |
+| 0% | 37.8 s | 35.4 s | 0 |
+| 25% (default) | 55.2 s | 50.4 s | 15.7 |
+| 50% | 73.1 s | 58.9 s | 31.1 |
 
 What this shows:
 
-- Max-pressure had the lowest average delay in every scenario: about 37% less than fixed timing in light traffic, 13% at the default load, and 7% near saturation.
-- Kerbside taxi stops are expensive on single-lane streets. Going from no taxis to a 50% share raises delay under fixed timing by about 70% (29 s per trip). Max-pressure's delay rises by a similar proportion, but it loses fewer seconds (24 s) and stays the lower of the two.
-- Actuated control does well in light traffic but loses its advantage under heavier load.
+- Max-pressure had the lowest delay from light to heavy traffic: about 33% less than fixed timing in light traffic and 9% at the default load. Near saturation, all strategies except the green wave are within half a second of each other.
+- Kerbside taxi stops are expensive on single-lane streets. Going from no taxis to a 50% share nearly doubles delay under fixed timing (+35 s per trip). Max-pressure's delay rises by much less (+24 s).
+- Actuated control comes close to max-pressure in light and moderate traffic.
 - The green wave only coordinates eastbound progression. On a grid with two-way traffic and short north–south blocks, it doesn't beat a plain fixed timer.
 - Results vary from seed to seed, which is why the tables average four seeds. The in-app benchmark uses a single seed, so expect some variation there.
 
-These numbers come from this model and are useful for comparing strategies. They are not calibrated against measured Addis Ababa traffic data.
+These numbers come from this model and are useful for comparing strategies. Queue discharge is calibrated to Addis Ababa measurements; demand and signal timings are not, because no published counts or plans were found for these junctions.
 
 ## Architecture
 
@@ -179,7 +210,7 @@ scripts/screenshots.mjs  regenerates docs/screenshots from the real build
 - Pedestrians cross only at junction crosswalks and don't have their own walk signals or push buttons. A pedestrian who has waited more than 10 s counts as demand for adaptive controllers.
 - The green-wave plan is computed when the simulation is built. Changing green times afterwards keeps the cycles aligned but doesn't recompute the optimal offsets.
 - `npm audit` reports a moderate advisory in `minimatch`, pulled in by ESLint. It only affects the local lint tooling, not the shipped app.
-- The Addis Ababa setting is a stylised grid using real junction names. It is not a map, and timings, speeds (a generic 50 km/h urban limit) and demand are not calibrated against measured Addis Ababa data. Use it to compare strategies, not to predict real traffic.
+- The Addis Ababa setting is a stylised grid using real junction names, not a map. Queue discharge, driver and pedestrian speeds come from published Addis figures (see Calibration). Demand, turning shares, signal timings, taxi share and dwell times are assumptions, because no published data was found for these junctions. Use it to compare strategies, not to predict real traffic at a specific junction.
 - Taxis stop in the running lane at randomly chosen points. They don't use designated taxi stands, and each stop is placed far enough from the junction behind it that a queued vehicle never blocks the box. Other modes common in the city, such as Anbessa buses, three-wheelers and the light rail, are not modelled.
 
 ## Possible improvements
