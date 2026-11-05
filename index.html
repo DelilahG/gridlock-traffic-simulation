@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Gridlock: an interactive traffic simulation of nine Addis Ababa junctions, with car-following physics, routed trips, minibus taxis, pedestrians and four traffic-signal control strategies." />
+    <meta name="theme-color" content="#0b1016" />
+    <title>Gridlock · Addis Ababa Traffic Simulation</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script type="module" crossorigin src="./assets/index-Dc3-o3Nb.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dmyvk8AG.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"><i></i><i></i><i></i></span>
+        <h1>GRIDLOCK <small>Addis Ababa Traffic Simulation</small></h1>
+      </div>
+      <div class="topbar-status">
+        <span class="chip" id="runState" data-state="ready">Ready</span>
+        <span class="chip level" id="level" data-level="idle" title="Network state">No traffic</span>
+        <span class="clock" aria-label="Simulated time">SIM <b id="clock">00:00</b></span>
+        <span class="fps"><b id="fps">–</b> fps</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="stage" aria-label="Simulation view">
+        <canvas id="world" role="img" aria-label="Top-down map of a 3 by 3 grid of signalised junctions with moving vehicles and pedestrians"></canvas>
+        <div class="overlay" id="intro">
+          <p class="overlay-title">Nine Addis Ababa junctions, from Piassa to Bole.</p>
+          <p>Cars and blue-and-white minibus taxis follow routed trips, keep safe gaps, yield on left turns and stop for pedestrians. Taxis pull over to pick up passengers, holding up the traffic behind them.</p>
+          <button class="btn pri" id="introStart" type="button"><i data-lucide="play"></i>Start simulation</button>
+        </div>
+        <div class="legend" aria-hidden="true">
+          <span>Speed</span><span>stopped</span><span class="ramp"></span><span>50 km/h</span>
+          <span class="sep"></span><span class="taxi"></span><span>minibus taxi</span>
+          <span class="sep"></span><span class="ring"></span><span>queue</span>
+        </div>
+        <div class="hint">Click a junction to inspect it</div>
+        <div class="error" id="error" role="alert" hidden></div>
+      </section>
+
+      <aside class="panel">
+        <section class="card">
+          <h2>Simulation</h2>
+          <div class="row">
+            <button class="btn pri" id="play" type="button"><i data-lucide="play"></i><span>Start</span></button>
+            <button class="btn icon" id="step" type="button" title="Advance one second (→)" aria-label="Advance one second"><i data-lucide="step-forward"></i></button>
+            <button class="btn icon" id="reset" type="button" title="Reset (R)" aria-label="Reset simulation"><i data-lucide="rotate-ccw"></i></button>
+          </div>
+          <label class="lbl" id="speedLbl">Simulation speed</label>
+          <div class="seg seg5" id="speed" role="radiogroup" aria-labelledby="speedLbl">
+            <button type="button" data-v="0.5">½×</button>
+            <button type="button" data-v="1" class="on">1×</button>
+            <button type="button" data-v="2">2×</button>
+            <button type="button" data-v="4">4×</button>
+            <button type="button" data-v="8">8×</button>
+          </div>
+          <label class="lbl" for="seed">Random seed <span class="hintx">same seed, same traffic</span></label>
+          <input id="seed" type="number" min="1" max="999999" value="1337" inputmode="numeric" />
+        </section>
+
+        <section class="card">
+          <h2>Signal control</h2>
+          <div class="seg seg2" id="modes" role="radiogroup" aria-label="Signal control strategy">
+            <button type="button" data-m="fixed" class="on">Fixed timer</button>
+            <button type="button" data-m="wave">Green wave</button>
+            <button type="button" data-m="actuated">Actuated</button>
+            <button type="button" data-m="pressure">Max-pressure</button>
+          </div>
+          <p class="desc" id="mdesc"></p>
+          <div class="sliders" id="timing"></div>
+        </section>
+
+        <section class="card">
+          <h2>Demand</h2>
+          <label class="lbl" for="demand">Vehicles entering <span class="val" id="demandV"></span></label>
+          <input id="demand" type="range" min="5" max="90" step="5" value="45" />
+          <label class="lbl" for="ew">East–west share <span class="val" id="ewV"></span></label>
+          <input id="ew" type="range" min="20" max="80" step="5" value="50" />
+          <label class="toggle"><input type="checkbox" id="peds" checked /> Pedestrians</label>
+          <label class="lbl" for="pedRate">Pedestrian arrivals <span class="val" id="pedRateV"></span></label>
+          <input id="pedRate" type="range" min="2" max="40" step="2" value="12" />
+          <label class="lbl" for="taxis">Minibus taxis <span class="val" id="taxisV"></span></label>
+          <input id="taxis" type="range" min="0" max="50" step="5" value="25" />
+          <label class="toggle"><input type="checkbox" id="smart" /> Congestion-aware routing</label>
+          <label class="toggle"><input type="checkbox" id="heat" checked /> Colour vehicles by speed</label>
+        </section>
+
+        <section class="card">
+          <h2>Live metrics</h2>
+          <div class="stats">
+            <div class="stat"><b id="m_speed">0</b><span>avg speed km/h</span></div>
+            <div class="stat"><b id="m_thr">0</b><span>exits / min</span></div>
+            <div class="stat"><b id="m_delay">–</b><span>avg delay s</span></div>
+            <div class="stat"><b id="m_stop">–</b><span>avg time stopped s</span></div>
+            <div class="stat"><b id="m_on">0</b><span>on road · <em id="m_stopped">0</em> stopped</span></div>
+            <div class="stat"><b id="m_pend">0</b><span>waiting to enter</span></div>
+            <div class="stat"><b id="m_ped">0</b><span>pedestrians crossed</span></div>
+            <div class="stat"><b id="m_pw">–</b><span>avg ped wait s</span></div>
+            <div class="stat"><b id="m_taxi">0</b><span>taxis · <em id="m_kerb">0</em> at the kerb</span></div>
+            <div class="stat"><b id="m_tstops">0</b><span>taxi pick-ups</span></div>
+          </div>
+          <div class="spark">
+            <div class="spark-h"><span>Avg speed</span><span>last 3 min</span></div>
+            <canvas id="sparkSpeed" height="44"></canvas>
+            <div class="spark-h"><span>Vehicles stopped</span></div>
+            <canvas id="sparkStop" height="44"></canvas>
+          </div>
+          <p class="safety" id="safety"></p>
+        </section>
+
+        <section class="card">
+          <h2>Junction</h2>
+          <div id="inspector"><p class="empty">Click a junction on the map to see its signal phase and queues.</p></div>
+          <div class="hot" id="hotspots"></div>
+        </section>
+
+        <section class="card">
+          <h2>Compare controllers</h2>
+          <p class="desc first">Runs all four strategies headless with your current demand, timing and seed: a 1 min warm-up, then 5 min measured.</p>
+          <div class="row">
+            <button class="btn pri" id="bench" type="button"><i data-lucide="gauge"></i><span>Run benchmark</span></button>
+          </div>
+          <div class="progress" id="bprog" hidden><i></i></div>
+          <p class="bstat" id="bstat" aria-live="polite"></p>
+          <div class="tablewrap">
+            <table id="btab" hidden>
+              <thead>
+                <tr><th>Controller</th><th>Delay s</th><th>Stopped s</th><th>Exits/min</th><th>Ped s</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </aside>
+    </main>
+  </body>
+</html>
