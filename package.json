@@ -13,7 +13,8 @@
     "test": "node --test \"tests/unit/*.test.js\"",
     "test:e2e": "playwright test",
     "screenshots": "node scripts/screenshots.mjs",
-    "check": "npm run lint && npm test && npm run build && npm run test:e2e"
+    "check": "npm run lint && npm test && npm run build && npm run test:e2e",
+    "deploy": "node scripts/deploy-pages.mjs"
   },
   "engines": {
     "node": ">=20"

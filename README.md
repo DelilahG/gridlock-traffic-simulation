@@ -63,6 +63,14 @@ npm run preview    # http://localhost:4173
 
 No environment variables, API keys or backend services are needed. Everything runs in the browser.
 
+### Deploying
+
+```bash
+npm run deploy     # builds and publishes dist/ to the gh-pages branch
+```
+
+The live demo is served by GitHub Pages from the `gh-pages` branch.
+
 ## Testing
 
 ```bash
