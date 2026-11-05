@@ -1,6 +1,6 @@
-# Gridlock: City Traffic Simulation
+# Gridlock: Addis Ababa Traffic Simulation
 
-An interactive, browser-based traffic simulation of a 3×3 grid of signalised junctions. Vehicles drive routed trips with a car-following model, queue and spill back, yield on permissive left turns and stop for pedestrians. Four traffic-signal strategies, from a fixed timer to a max-pressure controller, can be compared live or in a headless benchmark that runs inside the page.
+An interactive, browser-based traffic simulation of nine well-known Addis Ababa junctions, from Piassa and Arat Kilo in the north to Meskel Square in the centre and Bole in the south-east. Cars and blue-and-white minibus taxis drive routed trips with a car-following model, queue and spill back, yield on permissive left turns and stop for pedestrians. Taxis pull over at the kerb to pick up passengers and hold up the traffic behind them. Four traffic-signal strategies, from a fixed timer to a max-pressure controller, can be compared live or in a headless benchmark that runs inside the page.
 
 **Live demo:** https://delilahg.github.io/gridlock-traffic-simulation/
 
@@ -12,7 +12,17 @@ An interactive, browser-based traffic simulation of a 3×3 grid of signalised ju
 
 ## Features
 
-- **Road network**: 9 junctions, 48 single-lane links and 108 turning movements. Every movement is a real geometric path: straight lines, plus circular arcs for turns.
+- **Addis Ababa junctions**: the nine junctions are named after real ones and placed roughly by compass direction (north at the top):
+
+  | | West | Centre | East |
+  | --- | --- | --- | --- |
+  | **North** | Piassa | Arat Kilo | Megenagna |
+  | **Middle** | Mexico | Meskel Square | Kazanchis |
+  | **South** | Sarbet | Gotera | Bole |
+
+  The layout is a stylised grid, not a map: distances, street widths and the real street pattern are not to scale.
+- **Road network**: 9 junctions, 48 single-lane links and 108 turning movements. Every movement is a real geometric path: straight lines, plus circular arcs for turns. Traffic drives on the right, as in Ethiopia.
+- **Minibus taxis**: a configurable share of vehicles (25% by default) are minibus taxis in the blue-and-white Addis livery. Each taxi plans kerbside stops along its route, brakes to a stop, dwells for 3–8 s with its hazard lights on, then pulls away. On single-lane roads everyone behind it waits, which is a major source of delay.
 - **Vehicle dynamics**: the [Intelligent Driver Model](https://en.wikipedia.org/wiki/Intelligent_driver_model) (IDM) handles acceleration, comfortable braking, speed-dependent following gaps and stopping at lines. Each driver has their own desired speed, and roughly 8% of vehicles are longer vans.
 - **Routing**: each vehicle gets an origin–destination trip and follows a Dijkstra shortest path, weighted by free-flow time plus turn penalties. An optional *congestion-aware routing* mode re-plans each departure around current queues.
 - **Junction safety logic**:
@@ -25,10 +35,11 @@ An interactive, browser-based traffic simulation of a 3×3 grid of signalised ju
 - **Four signal strategies**: Fixed timer, Green wave (coordinated offsets), Actuated (gap-out detectors), and Max-pressure.
 - **Configurable timing**: green times, min/max green, gap-out, amber and all-red. Changes apply to the running simulation.
 - **Controls**: start, pause, resume, step one second, reset, five simulation speeds (½× to 8×), and a reproducible random seed. Keyboard shortcuts: <kbd>Space</kbd> start/pause, <kbd>R</kbd> reset, <kbd>→</kbd> step.
-- **Demand**: total vehicles per minute, the east–west/north–south split, and pedestrian rate.
+- **Demand**: total vehicles per minute, the east–west/north–south split, the minibus taxi share, and pedestrian rate.
 - **Live metrics**:
   - average speed, exits per minute, average delay, time stopped
   - vehicles on the road, stopped, and waiting to enter (spillback)
+  - taxis on the road, taxis stopped at the kerb, and completed pick-ups
   - pedestrian counts and waits
   - 3-minute sparklines
   - a network state badge (Free flow / Busy / Heavy / Gridlock)
@@ -100,28 +111,37 @@ Browser tests use the preinstalled Microsoft Edge on Windows, so nothing needs t
 - *Simulation, other*: determinism by seed, vehicle conservation, saturation behaviour without NaNs, live demand, pedestrian and timing changes, and a per-step performance budget.
 - *Browser*: ready state, start/pause/resume/reset, single step, keyboard shortcuts, mode switching with matching timing controls, live sliders, seed, junction inspector, the full benchmark, mobile layout without horizontal scroll, and no console errors.
 
-Latest local run: lint clean, **32/32** unit tests and **10/10** browser tests passing.
+Latest local run: lint clean, **37/37** unit tests and **10/10** browser tests passing.
 
 ## Results: does adaptive control help?
 
-Average delay per trip (actual trip time minus free-flow trip time), averaged over 4 seeds, with 1 min warm-up and 5 min measured. Pedestrians are on, at 12/min. Lowest delay is in bold; throughput is in exits per minute.
+Average delay per trip (actual trip time minus free-flow trip time), averaged over 4 seeds, with 1 min warm-up and 5 min measured. Pedestrians are on, at 12/min, and 25% of vehicles are minibus taxis. Lowest delay is in bold; throughput is in exits per minute.
 
 | Scenario | Fixed | Green wave | Actuated | Max-pressure |
 |---|---|---|---|---|
-| Light (15 veh/min) | 23.4 s · 17/min | 25.8 s · 17/min | 17.0 s · 17/min | **16.6 s** · 17/min |
-| Moderate (30) | 25.2 s · 28/min | 29.2 s · 31/min | 26.0 s · 29/min | **21.8 s** · 30/min |
-| Default (45) | 41.3 s · 41/min | 40.5 s · 41/min | 38.5 s · 43/min | **36.5 s** · 44/min |
-| Unbalanced (45, 75% E–W) | 42.9 s · 40/min | 44.3 s · 41/min | 41.0 s · 41/min | **40.7 s** · 40/min |
-| Near saturation (60) | **53.0 s** · 47/min | 59.6 s · 46/min | 54.2 s · 48/min | 54.5 s · 47/min |
+| Light (15 veh/min) | 34.7 s · 15/min | 34.1 s · 15/min | 23.9 s · 16/min | **22.0 s** · 16/min |
+| Moderate (30) | 37.2 s · 27/min | 39.9 s · 29/min | 30.8 s · 28/min | **29.0 s** · 28/min |
+| Default (45) | 53.8 s · 41/min | 58.6 s · 40/min | 51.1 s · 39/min | **46.7 s** · 41/min |
+| Unbalanced (45, 75% E–W) | 58.5 s · 38/min | 56.7 s · 38/min | 59.7 s · 41/min | **53.5 s** · 38/min |
+| Near saturation (60) | 68.7 s · 39/min | 75.3 s · 38/min | 74.3 s · 39/min | **63.9 s** · 44/min |
+
+How much the taxis' kerbside stops cost, at the default load (45 veh/min, same seeds):
+
+| Taxi share | Fixed | Max-pressure | Taxi pick-ups / min |
+|---|---|---|---|
+| 0% | 42.0 s | 31.3 s | 0 |
+| 25% (default) | 53.8 s | 46.7 s | 17.5 |
+| 50% | 70.8 s | 55.3 s | 33.8 |
 
 What this shows:
 
-- Demand-responsive control helps most when traffic is light or moderate: max-pressure cuts delay by about 29% at 15 veh/min and 12% at the default load.
-- Near saturation, long fixed cycles are as good or better. Every phase change wastes about 4 s of amber and all-red, and capacity is ultimately limited by single-lane approaches where one waiting left-turner blocks everyone behind it.
+- Max-pressure had the lowest average delay in every scenario: about 37% less than fixed timing in light traffic, 13% at the default load, and 7% near saturation.
+- Kerbside taxi stops are expensive on single-lane streets. Going from no taxis to a 50% share raises delay under fixed timing by about 70% (29 s per trip). Max-pressure's delay rises by a similar proportion, but it loses fewer seconds (24 s) and stays the lower of the two.
+- Actuated control does well in light traffic but loses its advantage under heavier load.
 - The green wave only coordinates eastbound progression. On a grid with two-way traffic and short north–south blocks, it doesn't beat a plain fixed timer.
-- Results vary from seed to seed, which is why the table averages four seeds. The in-app benchmark uses a single seed, so expect some variation there.
+- Results vary from seed to seed, which is why the tables average four seeds. The in-app benchmark uses a single seed, so expect some variation there.
 
-These numbers come from this model and are useful for comparing strategies. They are not calibrated predictions for any real city.
+These numbers come from this model and are useful for comparing strategies. They are not calibrated against measured Addis Ababa traffic data.
 
 ## Architecture
 
@@ -159,7 +179,8 @@ scripts/screenshots.mjs  regenerates docs/screenshots from the real build
 - Pedestrians cross only at junction crosswalks and don't have their own walk signals or push buttons. A pedestrian who has waited more than 10 s counts as demand for adaptive controllers.
 - The green-wave plan is computed when the simulation is built. Changing green times afterwards keeps the cycles aligned but doesn't recompute the optimal offsets.
 - `npm audit` reports a moderate advisory in `minimatch`, pulled in by ESLint. It only affects the local lint tooling, not the shipped app.
-- The model is uncalibrated. Use it to compare strategies, not to predict a real city.
+- The Addis Ababa setting is a stylised grid using real junction names. It is not a map, and timings, speeds (a generic 50 km/h urban limit) and demand are not calibrated against measured Addis Ababa data. Use it to compare strategies, not to predict real traffic.
+- Taxis stop in the running lane at randomly chosen points. They don't use designated taxi stands, and each stop is placed far enough from the junction behind it that a queued vehicle never blocks the box. Other modes common in the city, such as Anbessa buses, three-wheelers and the light rail, are not modelled.
 
 ## Possible improvements
 
